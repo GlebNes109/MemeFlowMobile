@@ -1,0 +1,1376 @@
+openapi: 3.0.3
+info:
+  title: MemeFlow MVP API
+  version: 0.1.0
+  description: >
+    Минимальный контракт между backend и mobile для первой версии MemeFlow.
+    Предположение MVP: YouTube Shorts сохраняются как внешние ссылки с метаданными
+    и preview, без обязательного скачивания видеофайла на сервер.
+servers:
+  - url: https://api.memeflow.local
+tags:
+  - name: Auth
+  - name: Users
+  - name: Feed
+  - name: Search
+  - name: Media
+  - name: Memes
+  - name: Collections
+  - name: Groups
+  - name: Reports
+  - name: Moderation
+security:
+  - bearerAuth: []
+paths:
+  /v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login by login and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/users/me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyProfile'
+    patch:
+      tags: [Users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMyProfileRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyProfile'
+  /v1/users/me/memes:
+    get:
+      tags: [Users]
+      summary: List all memes of current user with direct and effective access
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Current user meme list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemePage'
+  /v1/users/me/collections:
+    get:
+      tags: [Users]
+      summary: List all collections of current user
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Current user collection list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPage'
+  /v1/users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get public profile of a user
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/users/{userId}/memes:
+    get:
+      tags: [Users]
+      summary: List public memes of a user
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Meme list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemePage'
+  /v1/users/{userId}/collections:
+    get:
+      tags: [Users]
+      summary: List public collections of a user
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Collection list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionPage'
+  /v1/feed:
+    get:
+      tags: [Feed]
+      summary: Get meme feed
+      security: []
+      description: >
+        `public` returns only approved public memes.
+        `accessible` returns approved public memes plus approved memes shared with user's groups.
+        If request has no authenticated user, `accessible` behaves like `public`.
+      parameters:
+        - in: query
+          name: scope
+          required: false
+          schema:
+            type: string
+            enum: [public, accessible]
+            default: public
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Feed page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemePage'
+  /v1/search:
+    get:
+      tags: [Search]
+      summary: Search users, collections and memes
+      security: []
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+  /v1/media/images:
+    post:
+      tags: [Media]
+      summary: Upload an image file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAsset'
+  /v1/media/{mediaAssetId}:
+    get:
+      tags: [Media]
+      summary: Get media asset status
+      parameters:
+        - $ref: '#/components/parameters/MediaAssetId'
+      responses:
+        '200':
+          description: Media asset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAsset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/media/external-imports:
+    post:
+      tags: [Media]
+      summary: Save image URL or YouTube Shorts URL as media asset
+      description: >
+        In MVP, external short videos are stored as links with metadata and preview only.
+        Backend must not download and host third-party short video files as primary media.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExternalImportRequest'
+      responses:
+        '201':
+          description: External media registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAsset'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /v1/memes:
+    post:
+      tags: [Memes]
+      summary: Create a meme from a prepared media asset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMemeRequest'
+      responses:
+        '201':
+          description: Meme created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemeDetails'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /v1/memes/{memeId}:
+    get:
+      tags: [Memes]
+      summary: Get meme details if accessible
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/MemeId'
+      responses:
+        '200':
+          description: Meme details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemeDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Memes]
+      summary: Update own meme
+      parameters:
+        - $ref: '#/components/parameters/MemeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemeRequest'
+      responses:
+        '200':
+          description: Updated meme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemeDetails'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Memes]
+      summary: Delete own meme
+      parameters:
+        - $ref: '#/components/parameters/MemeId'
+      responses:
+        '204':
+          description: Meme deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/collections:
+    post:
+      tags: [Collections]
+      summary: Create a meme collection
+      description: >
+        Collection visibility may expand effective access of memes inside this collection.
+        Backend must recompute effective meme access after collection creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCollectionRequest'
+      responses:
+        '201':
+          description: Collection created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDetails'
+  /v1/collections/{collectionId}:
+    get:
+      tags: [Collections]
+      summary: Get collection details if accessible
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/CollectionId'
+      responses:
+        '200':
+          description: Collection details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Collections]
+      summary: Update own collection
+      description: >
+        If collection visibility changes, backend must recompute effective access for all memes
+        currently included in this collection.
+      parameters:
+        - $ref: '#/components/parameters/CollectionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCollectionRequest'
+      responses:
+        '200':
+          description: Updated collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDetails'
+    delete:
+      tags: [Collections]
+      summary: Delete own collection
+      parameters:
+        - $ref: '#/components/parameters/CollectionId'
+      responses:
+        '204':
+          description: Collection deleted
+  /v1/collections/{collectionId}/items:
+    post:
+      tags: [Collections]
+      summary: Add memes to collection
+      description: >
+        Memes are appended in the order of `meme_ids`.
+        If collection visibility is broader than meme direct access, backend must recompute
+        effective access of affected memes.
+      parameters:
+        - $ref: '#/components/parameters/CollectionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCollectionItemsRequest'
+      responses:
+        '200':
+          description: Updated collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDetails'
+  /v1/collections/{collectionId}/items/{memeId}:
+    delete:
+      tags: [Collections]
+      summary: Remove a meme from collection
+      description: >
+        Backend must recompute effective access of the meme after removal from collection.
+      parameters:
+        - $ref: '#/components/parameters/CollectionId'
+        - $ref: '#/components/parameters/MemeId'
+      responses:
+        '204':
+          description: Meme removed from collection
+  /v1/groups:
+    post:
+      tags: [Groups]
+      summary: Create a group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetails'
+  /v1/groups/my:
+    get:
+      tags: [Groups]
+      summary: List groups of current user
+      responses:
+        '200':
+          description: Group list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+  /v1/groups/{groupId}:
+    get:
+      tags: [Groups]
+      summary: Get group details
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/groups/{groupId}/feed:
+    get:
+      tags: [Groups]
+      summary: Get memes shared with a group
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Group feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemePage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/groups/{groupId}/invites:
+    post:
+      tags: [Groups]
+      summary: Invite a user to a group
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupInviteRequest'
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupInvitation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/group-invitations:
+    get:
+      tags: [Groups]
+      summary: List invitations for current user
+      responses:
+        '200':
+          description: Invitation list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupInvitationListResponse'
+  /v1/group-invitations/{inviteId}/accept:
+    post:
+      tags: [Groups]
+      summary: Accept group invitation
+      parameters:
+        - $ref: '#/components/parameters/InviteId'
+      responses:
+        '200':
+          description: Invitation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupInvitation'
+  /v1/group-invitations/{inviteId}/decline:
+    post:
+      tags: [Groups]
+      summary: Decline group invitation
+      parameters:
+        - $ref: '#/components/parameters/InviteId'
+      responses:
+        '200':
+          description: Invitation declined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupInvitation'
+  /v1/reports:
+    post:
+      tags: [Reports]
+      summary: Report meme or collection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+      responses:
+        '201':
+          description: Report created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+  /v1/moderation/items:
+    get:
+      tags: [Moderation]
+      summary: List items for moderation
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+            default: pending
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Moderation queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationItemPage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/moderation/items/{itemType}/{itemId}/decision:
+    post:
+      tags: [Moderation]
+      summary: Approve or reject content
+      parameters:
+        - in: path
+          name: itemType
+          required: true
+          schema:
+            type: string
+            enum: [meme, collection]
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+      responses:
+        '200':
+          description: Decision saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationItem'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UserId:
+      in: path
+      name: userId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MemeId:
+      in: path
+      name: memeId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MediaAssetId:
+      in: path
+      name: mediaAssetId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CollectionId:
+      in: path
+      name: collectionId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    GroupId:
+      in: path
+      name: groupId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InviteId:
+      in: path
+      name: inviteId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Cursor:
+      in: query
+      name: cursor
+      required: false
+      schema:
+        type: string
+    Limit:
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+  responses:
+    Unauthorized:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          minLength: 3
+          maxLength: 32
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        display_name:
+          type: string
+          maxLength: 64
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+    AuthTokens:
+      type: object
+      required: [access_token, refresh_token, expires_in]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Lifetime of access token in seconds
+    AuthSession:
+      type: object
+      required: [tokens, user]
+      properties:
+        tokens:
+          $ref: '#/components/schemas/AuthTokens'
+        user:
+          $ref: '#/components/schemas/UserSummary'
+    UserSummary:
+      type: object
+      required: [id, login, display_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+    GroupSummary:
+      type: object
+      required: [id, name, member_count]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        member_count:
+          type: integer
+    MyProfile:
+      type: object
+      required: [id, login, display_name, groups]
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupSummary'
+    PublicProfile:
+      type: object
+      required: [id, login, display_name, public_meme_count, public_collection_count]
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        public_meme_count:
+          type: integer
+        public_collection_count:
+          type: integer
+    UpdateMyProfileRequest:
+      type: object
+      properties:
+        display_name:
+          type: string
+          maxLength: 64
+        bio:
+          type: string
+          maxLength: 256
+        avatar_url:
+          type: string
+          format: uri
+    Visibility:
+      type: string
+      enum: [public, private, groups]
+      description: >
+        UI label "ограниченный доступ" maps to API value `groups`.
+        `groups` means content is visible only to members of `shared_group_ids`.
+    ModerationStatus:
+      type: string
+      enum: [pending, approved, rejected]
+    MediaAsset:
+      type: object
+      required:
+        [id, kind, source_type, provider, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [image, external_video]
+        source_type:
+          type: string
+          enum: [image_upload, image_url, youtube_short_url]
+        provider:
+          type: string
+          enum: [upload, web, youtube]
+        status:
+          type: string
+          enum: [processing, ready, failed, blocked]
+        original_url:
+          type: string
+          format: uri
+          nullable: true
+        storage_url:
+          type: string
+          format: uri
+          nullable: true
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: integer
+          nullable: true
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    CreateExternalImportRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+    MemeCard:
+      type: object
+      required:
+        [id, author, media, direct_visibility, effective_visibility, moderation_status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/UserSummary'
+        media:
+          $ref: '#/components/schemas/MediaAsset'
+        caption:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        direct_visibility:
+          $ref: '#/components/schemas/Visibility'
+        direct_shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        effective_visibility:
+          $ref: '#/components/schemas/Visibility'
+        effective_shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        access_source:
+          type: string
+          enum: [direct, inherited_from_collections, combined]
+        moderation_status:
+          $ref: '#/components/schemas/ModerationStatus'
+        created_at:
+          type: string
+          format: date-time
+    MemeDetails:
+      allOf:
+        - $ref: '#/components/schemas/MemeCard'
+        - type: object
+          properties:
+            can_edit:
+              type: boolean
+            collection_ids:
+              type: array
+              items:
+                type: string
+                format: uuid
+            inherited_access_from_collections:
+              type: array
+              items:
+                $ref: '#/components/schemas/CollectionAccessSummary'
+    CreateMemeRequest:
+      type: object
+      required: [media_asset_id, visibility]
+      properties:
+        media_asset_id:
+          type: string
+          format: uuid
+        caption:
+          type: string
+          maxLength: 280
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 20
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      description: >
+        This sets meme direct access only.
+        `shared_group_ids` is required when `visibility=groups`.
+    UpdateMemeRequest:
+      type: object
+      properties:
+        caption:
+          type: string
+          maxLength: 280
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      description: >
+        This updates meme direct access only.
+        Effective access may remain broader if some collections still expose this meme wider.
+    CollectionCard:
+      type: object
+      required:
+        [id, name, author, visibility, moderation_status, item_count, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        author:
+          $ref: '#/components/schemas/UserSummary'
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        moderation_status:
+          $ref: '#/components/schemas/ModerationStatus'
+        item_count:
+          type: integer
+        cover_thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    CollectionDetails:
+      allOf:
+        - $ref: '#/components/schemas/CollectionCard'
+        - type: object
+          properties:
+            can_edit:
+              type: boolean
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/CollectionItemView'
+    CreateCollectionRequest:
+      type: object
+      required: [name, visibility]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 500
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        meme_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      description: >
+        `shared_group_ids` is required when `visibility=groups`.
+        If collection visibility is broader than direct access of included memes,
+        backend must recompute effective access of those memes.
+    UpdateCollectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 500
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      description: >
+        `shared_group_ids` is required when `visibility=groups`.
+        If collection visibility changes, backend must recompute effective access
+        of all memes in the collection.
+    AddCollectionItemsRequest:
+      type: object
+      required: [meme_ids]
+      properties:
+        meme_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+      description: >
+        Items are appended in request order.
+        Adding memes to a broader collection may expand their effective access.
+    CollectionItemView:
+      type: object
+      required: [position, meme]
+      properties:
+        position:
+          type: integer
+        meme:
+          $ref: '#/components/schemas/MemeCard'
+    CollectionAccessSummary:
+      type: object
+      required: [id, name, visibility]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        shared_group_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    CreateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+    GroupMember:
+      type: object
+      required: [user, role]
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        role:
+          type: string
+          enum: [owner, member]
+    GroupDetails:
+      type: object
+      required: [id, name, members]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMember'
+        current_user_role:
+          type: string
+          enum: [owner, member]
+          nullable: true
+    CreateGroupInviteRequest:
+      type: object
+      required: [invitee_user_id]
+      properties:
+        invitee_user_id:
+          type: string
+          format: uuid
+    GroupInvitation:
+      type: object
+      required: [id, group, inviter, invitee, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        group:
+          $ref: '#/components/schemas/GroupSummary'
+        inviter:
+          $ref: '#/components/schemas/UserSummary'
+        invitee:
+          $ref: '#/components/schemas/UserSummary'
+        status:
+          type: string
+          enum: [pending, accepted, declined]
+        created_at:
+          type: string
+          format: date-time
+    CreateReportRequest:
+      type: object
+      required: [target_type, target_id, reason]
+      properties:
+        target_type:
+          type: string
+          enum: [meme, collection]
+        target_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [spam, nsfw, violence, hate, copyright, other]
+        comment:
+          type: string
+          maxLength: 500
+    Report:
+      type: object
+      required: [id, target_type, target_id, reason, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        target_type:
+          type: string
+          enum: [meme, collection]
+        target_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        comment:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [open, resolved, rejected]
+        created_at:
+          type: string
+          format: date-time
+    ModerationItem:
+      type: object
+      required: [item_type, item_id, moderation_status, created_at]
+      properties:
+        item_type:
+          type: string
+          enum: [meme, collection]
+        item_id:
+          type: string
+          format: uuid
+        moderation_status:
+          $ref: '#/components/schemas/ModerationStatus'
+        meme:
+          $ref: '#/components/schemas/MemeCard'
+        collection:
+          $ref: '#/components/schemas/CollectionCard'
+        created_at:
+          type: string
+          format: date-time
+    ModerationDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        comment:
+          type: string
+          maxLength: 500
+    MemePage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemeCard'
+        next_cursor:
+          type: string
+          nullable: true
+    CollectionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionCard'
+        next_cursor:
+          type: string
+          nullable: true
+    GroupListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupSummary'
+    GroupInvitationListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupInvitation'
+    ModerationItemPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModerationItem'
+        next_cursor:
+          type: string
+          nullable: true
+    SearchResponse:
+      type: object
+      required: [users, memes, collections]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummary'
+        memes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemeCard'
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionCard'
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
