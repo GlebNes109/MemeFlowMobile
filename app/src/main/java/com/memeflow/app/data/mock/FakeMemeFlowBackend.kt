@@ -86,7 +86,7 @@ class FakeMemeFlowBackend {
             login = normalized,
             displayName = displayName.trim(),
             avatarUrl = "https://picsum.photos/seed/$normalized/120/120",
-            bio = "Коллекционирую мемы с хорошим таймингом.",
+            bio = "Коллекционирую мемы.",
             createdAt = System.currentTimeMillis()
         )
         users[userId] = FakeUser(profile, password)

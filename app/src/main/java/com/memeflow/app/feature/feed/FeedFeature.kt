@@ -169,7 +169,7 @@ fun FeedScreen(
                                     Text("Войти, чтобы видеть private/groups контент")
                                 }
                             } else {
-                                SectionTitle("Ваш фид", "Контент подмешивается по access model из спецификации.")
+                                SectionTitle("Ваш фид", "Каждый день новые мемы")
                             }
                         }
                         items(state.items, key = { it.id }) { meme ->

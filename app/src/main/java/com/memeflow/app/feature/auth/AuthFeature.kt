@@ -118,7 +118,7 @@ fun AuthScreen(
         ) {
             Text(text = "MemeFlow", style = MaterialTheme.typography.displaySmall)
             Text(
-                text = "Гостевой feed, авторизация, группы и доступы уже связаны моковым backend-state.",
+                text = "Делиться мемами так же просто, как смеяться над ними\n",
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
